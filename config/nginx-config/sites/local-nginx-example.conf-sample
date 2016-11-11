@@ -13,7 +13,7 @@
 #                  configuration below to mylocaldomain.com
 # 2. root        - Change root to the full path that your WordPress
 #                  site lives at inside Vagrant. An example would be
-#                  /srv/www/mylocal-wordpress
+#                  /home/wwwroot/mylocal-wordpress
 #
 # You do not need to worry about modifying the listen or include
 # parameters as those are the same across all test sites for most
@@ -37,7 +37,7 @@ server {
     server_name  testserver.com;
 
     # Tells nginx which directory the files for this domain are located
-    root         /srv/www/wordpress-local;
+    root         /home/wwwroot/wordpress-local;
 
     # Includes a basic WordPress configuration to help with the common
     # rules needed by a web server to deal with WordPress properly.

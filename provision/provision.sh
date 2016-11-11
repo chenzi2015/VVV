@@ -25,40 +25,37 @@ apt_package_install_list=()
 # status before adding them to the apt_package_install_list array.
 apt_package_check_list=(
 
-  # PHP7
+  # PHP5.6
   #
-  # Our base packages for php7.0. As long as php7.0-fpm and php7.0-cli are
-  # installed, there is no need to install the general php7.0 package, which
+  # Our base packages for php5.6. As long as php5.6-fpm and php5.6-cli are
+  # installed, there is no need to install the general php5.6 package, which
   # can sometimes install apache as a requirement.
-  php7.0-fpm
-  php7.0-cli
+  php5.6-fpm
+  php5.6-cli
 
   # Common and dev packages for php
-  php7.0-common
-  php7.0-dev
+  php5.6-common
+  php5.6-dev
 
   # Extra PHP modules that we find useful
-  php-imagick
-  php-memcache
   php-pear
-  php7.0-bcmath
-  php7.0-curl
-  php7.0-gd
-  php7.0-mbstring
-  php7.0-mcrypt
-  php7.0-mysql
-  php7.0-imap
-  php7.0-json
-  php7.0-soap
-  php7.0-ssh2
-  php7.0-xml
-  php7.0-zip
+  php5.6-bcmath
+  php5.6-curl
+  php5.6-gd
+  php5.6-mbstring
+  php5.6-mcrypt
+  php5.6-mysql
+  php5.6-mysqli
+  php5.6-imap
+  php5.6-json
+  php5.6-soap
+  php5.6-ssh2
+  php5.6-xml
+  php5.6-zip
+  php5.6-redis
 
   # nginx is installed as the default web server
   nginx
-
-  # memcached is made available for object caching
-  memcached
 
   # mysql is the default database
   mysql-server
@@ -79,24 +76,7 @@ apt_package_check_list=(
   # ntp service to keep clock current
   ntp
 
-  # Req'd for i18n tools
-  gettext
-
-  # Req'd for Webgrind
-  graphviz
-
-  # dos2unix
-  # Allows conversion of DOS style line endings to something we'll have less
-  # trouble with in Linux.
-  dos2unix
-
-  # nodejs for use by grunt
-  g++
-  nodejs
-
-  #Mailcatcher requirement
-  libsqlite3-dev
-
+  beanstalkd
 )
 
 ### FUNCTIONS
@@ -104,14 +84,14 @@ apt_package_check_list=(
 network_detection() {
   # Network Detection
   #
-  # Make an HTTP request to google.com to determine if outside access is available
+  # Make an HTTP request to baidu.com to determine if outside access is available
   # to us. If 3 attempts with a timeout of 5 seconds are not successful, then we'll
   # skip a few things further in provisioning rather than create a bunch of errors.
-  if [[ "$(wget --tries=3 --timeout=5 --spider http://google.com 2>&1 | grep 'connected')" ]]; then
+  if [[ "$(wget --tries=3 --timeout=5 --spider http://www.baidu.com 2>&1 | grep 'connected')" ]]; then
     echo "Network connection detected..."
     ping_result="Connected"
   else
-    echo "Network connection not detected. Unable to reach google.com..."
+    echo "Network connection not detected. Unable to reach baidu.com..."
     ping_result="Not Connected"
   fi
 }
@@ -120,7 +100,7 @@ network_check() {
   network_detection
   if [[ ! "$ping_result" == "Connected" ]]; then
     echo -e "\nNo network connection available, skipping package installation"
-    exit 0
+#    exit 0
   fi
 }
 
@@ -241,12 +221,6 @@ package_install() {
   ln -sf /srv/config/apt-source-append.list /etc/apt/sources.list.d/vvv-sources.list
   echo "Linked custom apt sources"
 
-  if [[ ! $( apt-key list | grep 'NodeSource') ]]; then
-      # Retrieve the NodeJS signing key from nodesource.com
-      echo "Applying NodeSource NodeJS signing key..."
-	  wget -qO- https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -
-  fi
-
   if [[ ${#apt_package_install_list[@]} = 0 ]]; then
     echo -e "No apt packages to install.\n"
   else
@@ -283,31 +257,10 @@ tools_install() {
   # Disable xdebug before any composer provisioning.
   sh /home/vagrant/bin/xdebug_off
 
-  # nvm
-  if [[ ! -d "/srv/config/nvm" ]]; then
-    echo -e "\nDownloading nvm, see https://github.com/creationix/nvm"
-    git clone "https://github.com/creationix/nvm.git" "/srv/config/nvm"
-    cd /srv/config/nvm
-    git checkout `git describe --abbrev=0 --tags`
-  else
-    echo -e "\nUpdating nvm..."
-    cd /srv/config/nvm
-    git pull origin master
-    git checkout `git describe --abbrev=0 --tags`
-  fi
-  # Activate nvm
-  source /srv/config/nvm/nvm.sh
-
-  # npm
-  #
-  # Make sure we have the latest npm version and the update checker module
-  npm install -g npm
-  npm install -g npm-check-updates
-
   # Xdebug
   #
   # The version of Xdebug 2.4.0 that is available for our Ubuntu installation
-  # is not compatible with PHP 7.0. We instead retrieve the source package and
+  # is not compatible with PHP 5.6. We instead retrieve the source package and
   # go through the manual installation steps.
   if [[ -f /usr/lib/php/20151012/xdebug.so ]]; then
       echo "Xdebug already installed"
@@ -330,71 +283,6 @@ tools_install() {
       rm -rf xdebug-2.4.0*
       echo "Xdebug installed"
   fi
-
-  # ack-grep
-  #
-  # Install ack-rep directory from the version hosted at beyondgrep.com as the
-  # PPAs for Ubuntu Precise are not available yet.
-  if [[ -f /usr/bin/ack ]]; then
-    echo "ack-grep already installed"
-  else
-    echo "Installing ack-grep as ack"
-    curl -s http://beyondgrep.com/ack-2.14-single-file > "/usr/bin/ack" && chmod +x "/usr/bin/ack"
-  fi
-
-  # COMPOSER
-  #
-  # Install Composer if it is not yet available.
-  if [[ ! -n "$(composer --version --no-ansi | grep 'Composer version')" ]]; then
-    echo "Installing Composer..."
-    curl -sS "https://getcomposer.org/installer" | php
-    chmod +x "composer.phar"
-    mv "composer.phar" "/usr/local/bin/composer"
-  fi
-
-  if [[ -f /vagrant/provision/github.token ]]; then
-    ghtoken=`cat /vagrant/provision/github.token`
-    composer config --global github-oauth.github.com $ghtoken
-    echo "Your personal GitHub token is set for Composer."
-  fi
-
-  # Update both Composer and any global packages. Updates to Composer are direct from
-  # the master branch on its GitHub repository.
-  if [[ -n "$(composer --version --no-ansi | grep 'Composer version')" ]]; then
-    echo "Updating Composer..."
-    COMPOSER_HOME=/usr/local/src/composer composer self-update
-    COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update phpunit/phpunit:5.*
-    COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update phpunit/php-invoker:1.1.*
-    COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update mockery/mockery:0.9.*
-    COMPOSER_HOME=/usr/local/src/composer composer -q global require --no-update d11wtq/boris:v1.0.8
-    COMPOSER_HOME=/usr/local/src/composer composer -q global config bin-dir /usr/local/bin
-    COMPOSER_HOME=/usr/local/src/composer composer global update
-  fi
-
-  # Grunt
-  #
-  # Install or Update Grunt based on current state.  Updates are direct
-  # from NPM
-  if [[ "$(grunt --version)" ]]; then
-    echo "Updating Grunt CLI"
-    npm update -g grunt-cli &>/dev/null
-    npm update -g grunt-sass &>/dev/null
-    npm update -g grunt-cssjanus &>/dev/null
-    npm update -g grunt-rtlcss &>/dev/null
-  else
-    echo "Installing Grunt CLI"
-    npm install -g grunt-cli &>/dev/null
-    npm install -g grunt-sass &>/dev/null
-    npm install -g grunt-cssjanus &>/dev/null
-    npm install -g grunt-rtlcss &>/dev/null
-  fi
-
-  # Graphviz
-  #
-  # Set up a symlink between the Graphviz path defined in the default Webgrind
-  # config and actual path.
-  echo "Adding graphviz symlink for Webgrind..."
-  ln -sf "/usr/bin/dot" "/usr/local/bin/dot"
 }
 
 nginx_setup() {
@@ -427,34 +315,41 @@ nginx_setup() {
     mkdir "/etc/nginx/custom-sites/"
   fi
   rsync -rvzh --delete "/srv/config/nginx-config/sites/" "/etc/nginx/custom-sites/"
+  cp "/srv/config/nginx-config/other.conf" "/etc/nginx/other.conf"
+  cp "/srv/config/nginx-config/fastcgi_params" "/etc/nginx/fastcgi_params"
+  cp "/srv/config/nginx-config/enable-php.conf" "/etc/nginx/enable-php.conf"
+  cp "/srv/config/nginx-config/discuz.conf" "/etc/nginx/discuz.conf"
 
   echo " * Copied /srv/config/nginx-config/nginx.conf           to /etc/nginx/nginx.conf"
   echo " * Copied /srv/config/nginx-config/nginx-wp-common.conf to /etc/nginx/nginx-wp-common.conf"
   echo " * Rsync'd /srv/config/nginx-config/sites/              to /etc/nginx/custom-sites"
+  echo " * Copied /srv/config/nginx-config/other.conf           to /etc/nginx/other.conf"
+  echo " * Copied /srv/config/nginx-config/fastcgi_params       to /etc/nginx/fastcgi_params"
+  echo " * Copied /srv/config/nginx-config/enable-php.conf      to /etc/nginx/enable-php.conf"
+  echo " * Copied /srv/config/nginx-config/discuz.conf          to /etc/nginx/discuz.conf"
+
+  if [[ ! -d "/home/wwwlogs" ]]; then
+    mkdir "/home/wwwlogs"
+  fi
 }
 
 phpfpm_setup() {
   # Copy php-fpm configuration from local
-  cp "/srv/config/php-config/php7-fpm.conf" "/etc/php/7.0/fpm/php-fpm.conf"
-  cp "/srv/config/php-config/www.conf" "/etc/php/7.0/fpm/pool.d/www.conf"
-  cp "/srv/config/php-config/php-custom.ini" "/etc/php/7.0/fpm/conf.d/php-custom.ini"
-  cp "/srv/config/php-config/opcache.ini" "/etc/php/7.0/fpm/conf.d/opcache.ini"
-  cp "/srv/config/php-config/xdebug.ini" "/etc/php/7.0/mods-available/xdebug.ini"
+  cp "/srv/config/php-config/php5.6-fpm.conf" "/etc/php/5.6/fpm/php-fpm.conf"
+  cp "/srv/config/php-config/www.conf" "/etc/php/5.6/fpm/pool.d/www.conf"
+  cp "/srv/config/php-config/php-custom.ini" "/etc/php/5.6/fpm/conf.d/php-custom.ini"
+  cp "/srv/config/php-config/opcache.ini" "/etc/php/5.6/fpm/conf.d/opcache.ini"
+  cp "/srv/config/php-config/xdebug.ini" "/etc/php/5.6/fpm/conf.d/xdebug.ini"
 
   # Find the path to Xdebug and prepend it to xdebug.ini
   XDEBUG_PATH=$( find /usr/lib/php/ -name 'xdebug.so' | head -1 )
-  sed -i "1izend_extension=\"$XDEBUG_PATH\"" "/etc/php/7.0/mods-available/xdebug.ini"
+  sed -i "1izend_extension=\"$XDEBUG_PATH\"" "/etc/php/5.6/fpm/conf.d/xdebug.ini"
 
-  echo " * Copied /srv/config/php-config/php7-fpm.conf     to /etc/php/7.0/fpm/php-fpm.conf"
-  echo " * Copied /srv/config/php-config/www.conf          to /etc/php/7.0/fpm/pool.d/www.conf"
-  echo " * Copied /srv/config/php-config/php-custom.ini    to /etc/php/7.0/fpm/conf.d/php-custom.ini"
-  echo " * Copied /srv/config/php-config/opcache.ini       to /etc/php/7.0/fpm/conf.d/opcache.ini"
-  echo " * Copied /srv/config/php-config/xdebug.ini        to /etc/php/7.0/mods-available/xdebug.ini"
-
-  # Copy memcached configuration from local
-  cp "/srv/config/memcached-config/memcached.conf" "/etc/memcached.conf"
-
-  echo " * Copied /srv/config/memcached-config/memcached.conf   to /etc/memcached.conf"
+  echo " * Copied /srv/config/php-config/php5.6-fpm.conf     to /etc/php/5.6/fpm/php-fpm.conf"
+  echo " * Copied /srv/config/php-config/www.conf          to /etc/php/5.6/fpm/pool.d/www.conf"
+  echo " * Copied /srv/config/php-config/php-custom.ini    to /etc/php/5.6/fpm/conf.d/php-custom.ini"
+  echo " * Copied /srv/config/php-config/opcache.ini       to /etc/php/5.6/fpm/conf.d/opcache.ini"
+  echo " * Copied /srv/config/php-config/xdebug.ini        to /etc/php/5.6/fpm/conf.d/xdebug.ini"
 }
 
 mysql_setup() {
@@ -483,76 +378,6 @@ mysql_setup() {
       service mysql restart
     fi
 
-    # IMPORT SQL
-    #
-    # Create the databases (unique to system) that will be imported with
-    # the mysqldump files located in database/backups/
-    if [[ -f "/srv/database/init-custom.sql" ]]; then
-      mysql -u "root" -p"root" < "/srv/database/init-custom.sql"
-      echo -e "\nInitial custom MySQL scripting..."
-    else
-      echo -e "\nNo custom MySQL scripting found in database/init-custom.sql, skipping..."
-    fi
-
-    # Setup MySQL by importing an init file that creates necessary
-    # users and databases that our vagrant setup relies on.
-    mysql -u "root" -p"root" < "/srv/database/init.sql"
-    echo "Initial MySQL prep..."
-
-    # Process each mysqldump SQL file in database/backups to import
-    # an initial data set for MySQL.
-    "/srv/database/import-sql.sh"
-  else
-    echo -e "\nMySQL is not installed. No databases imported."
-  fi
-}
-
-mailcatcher_setup() {
-  # Mailcatcher
-  #
-  # Installs mailcatcher using RVM. RVM allows us to install the
-  # current version of ruby and all mailcatcher dependencies reliably.
-  local pkg
-  local rvm_version
-  local mailcatcher_version
-
-  rvm_version="$(/usr/bin/env rvm --silent --version 2>&1 | grep 'rvm ' | cut -d " " -f 2)"
-  if [[ -n "${rvm_version}" ]]; then
-    pkg="RVM"
-    print_pkg_info "$pkg" "$rvm_version"
-  else
-    # RVM key D39DC0E3
-    # Signatures introduced in 1.26.0
-    gpg -q --no-tty --batch --keyserver "hkp://keyserver.ubuntu.com:80" --recv-keys D39DC0E3
-    gpg -q --no-tty --batch --keyserver "hkp://keyserver.ubuntu.com:80" --recv-keys BF04FF17
-
-    printf " * RVM [not installed]\n Installing from source"
-    curl --silent -L "https://get.rvm.io" | sudo bash -s stable --ruby
-    source "/usr/local/rvm/scripts/rvm"
-  fi
-
-  mailcatcher_version="$(/usr/bin/env mailcatcher --version 2>&1 | grep 'mailcatcher ' | cut -d " " -f 2)"
-  if [[ -n "${mailcatcher_version}" ]]; then
-    pkg="Mailcatcher"
-    print_pkg_info "$pkg" "$mailcatcher_version"
-  else
-    echo " * Mailcatcher [not installed]"
-    /usr/bin/env rvm default@mailcatcher --create do gem install mailcatcher --no-rdoc --no-ri
-    /usr/bin/env rvm wrapper default@mailcatcher --no-prefix mailcatcher catchmail
-  fi
-
-  if [[ -f "/etc/init/mailcatcher.conf" ]]; then
-    echo " *" Mailcatcher upstart already configured.
-  else
-    cp "/srv/config/init/mailcatcher.conf"  "/etc/init/mailcatcher.conf"
-    echo " * Copied /srv/config/init/mailcatcher.conf    to /etc/init/mailcatcher.conf"
-  fi
-
-  if [[ -f "/etc/php/7.0/mods-available/mailcatcher.ini" ]]; then
-    echo " *" Mailcatcher php7 fpm already configured.
-  else
-    cp "/srv/config/php-config/mailcatcher.ini" "/etc/php/7.0/mods-available/mailcatcher.ini"
-    echo " * Copied /srv/config/php-config/mailcatcher.ini    to /etc/php/7.0/mods-available/mailcatcher.ini"
   fi
 }
 
@@ -562,154 +387,15 @@ services_restart() {
   # Make sure the services we expect to be running are running.
   echo -e "\nRestart services..."
   service nginx restart
-  service memcached restart
-  service mailcatcher restart
-
-  # Disable PHP Xdebug module by default
-  phpdismod xdebug
 
   # Enable PHP mcrypt module by default
   phpenmod mcrypt
 
-  # Enable PHP mailcatcher sendmail settings by default
-  phpenmod mailcatcher
-
-  service php7.0-fpm restart
+  service php5.6-fpm restart
 
   # Add the vagrant user to the www-data group so that it has better access
   # to PHP and Nginx related files.
   usermod -a -G www-data vagrant
-}
-
-wp_cli() {
-  # WP-CLI Install
-  if [[ ! -d "/srv/www/wp-cli" ]]; then
-    echo -e "\nDownloading wp-cli, see http://wp-cli.org"
-    git clone "https://github.com/wp-cli/wp-cli.git" "/srv/www/wp-cli"
-    cd /srv/www/wp-cli
-    composer install
-  else
-    echo -e "\nUpdating wp-cli..."
-    cd /srv/www/wp-cli
-    git pull --rebase origin master
-    composer update
-  fi
-  # Link `wp` to the `/usr/local/bin` directory
-  ln -sf "/srv/www/wp-cli/bin/wp" "/usr/local/bin/wp"
-}
-
-memcached_admin() {
-  # Download and extract phpMemcachedAdmin to provide a dashboard view and
-  # admin interface to the goings on of memcached when running
-  if [[ ! -d "/srv/www/default/memcached-admin" ]]; then
-    echo -e "\nDownloading phpMemcachedAdmin, see https://github.com/wp-cloud/phpmemcacheadmin"
-    cd /srv/www/default
-    wget -q -O phpmemcachedadmin.tar.gz "https://github.com/wp-cloud/phpmemcacheadmin/archive/1.2.2.1.tar.gz"
-    tar -xf phpmemcachedadmin.tar.gz
-    mv phpmemcacheadmin* memcached-admin
-    rm phpmemcachedadmin.tar.gz
-  else
-    echo "phpMemcachedAdmin already installed."
-  fi
-}
-
-opcached_status(){
-  # Checkout Opcache Status to provide a dashboard for viewing statistics
-  # about PHP's built in opcache.
-  if [[ ! -d "/srv/www/default/opcache-status" ]]; then
-    echo -e "\nDownloading Opcache Status, see https://github.com/rlerdorf/opcache-status/"
-    cd /srv/www/default
-    git clone "https://github.com/rlerdorf/opcache-status.git" opcache-status
-  else
-    echo -e "\nUpdating Opcache Status"
-    cd /srv/www/default/opcache-status
-    git pull --rebase origin master
-  fi
-}
-
-webgrind_install() {
-  # Webgrind install (for viewing callgrind/cachegrind files produced by
-  # xdebug profiler)
-  if [[ ! -d "/srv/www/default/webgrind" ]]; then
-    echo -e "\nDownloading webgrind, see https://github.com/michaelschiller/webgrind.git"
-    git clone "https://github.com/michaelschiller/webgrind.git" "/srv/www/default/webgrind"
-  else
-    echo -e "\nUpdating webgrind..."
-    cd /srv/www/default/webgrind
-    git pull --rebase origin master
-  fi
-}
-
-php_codesniff() {
-  # PHP_CodeSniffer (for running WordPress-Coding-Standards)
-  if [[ ! -d "/srv/www/phpcs" ]]; then
-    echo -e "\nDownloading PHP_CodeSniffer (phpcs), see https://github.com/squizlabs/PHP_CodeSniffer"
-    git clone -b master "https://github.com/squizlabs/PHP_CodeSniffer.git" "/srv/www/phpcs"
-  else
-    cd /srv/www/phpcs
-    if [[ $(git rev-parse --abbrev-ref HEAD) == 'master' ]]; then
-      echo -e "\nUpdating PHP_CodeSniffer (phpcs)..."
-      git pull --no-edit origin master
-    else
-      echo -e "\nSkipped updating PHP_CodeSniffer since not on master branch"
-    fi
-  fi
-
-  # Link `phpcbf` and `phpcs` to the `/usr/local/bin` directory
-  ln -sf "/srv/www/phpcs/scripts/phpcbf" "/usr/local/bin/phpcbf"
-  ln -sf "/srv/www/phpcs/scripts/phpcs" "/usr/local/bin/phpcs"
-
-  # Sniffs WordPress Coding Standards
-  if [[ ! -d "/srv/www/phpcs/CodeSniffer/Standards/WordPress" ]]; then
-    echo -e "\nDownloading WordPress-Coding-Standards, sniffs for PHP_CodeSniffer, see https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards"
-    git clone -b master "https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards.git" "/srv/www/phpcs/CodeSniffer/Standards/WordPress"
-  else
-    cd /srv/www/phpcs/CodeSniffer/Standards/WordPress
-    if [[ $(git rev-parse --abbrev-ref HEAD) == 'master' ]]; then
-      echo -e "\nUpdating PHP_CodeSniffer WordPress Coding Standards..."
-      git pull --no-edit origin master
-    else
-      echo -e "\nSkipped updating PHPCS WordPress Coding Standards since not on master branch"
-    fi
-  fi
-
-  # Install the standards in PHPCS
-  phpcs --config-set installed_paths ./CodeSniffer/Standards/WordPress/
-  phpcs --config-set default_standard WordPress-Core
-  phpcs -i
-}
-
-phpmyadmin_setup() {
-  # Download phpMyAdmin
-  if [[ ! -d /srv/www/default/database-admin ]]; then
-    echo "Downloading phpMyAdmin..."
-    cd /srv/www/default
-    wget -q -O phpmyadmin.tar.gz "https://files.phpmyadmin.net/phpMyAdmin/4.6.0/phpMyAdmin-4.6.0-all-languages.tar.gz"
-    tar -xf phpmyadmin.tar.gz
-    mv phpMyAdmin-4.6.0-all-languages database-admin
-    rm phpmyadmin.tar.gz
-  else
-    echo "PHPMyAdmin already installed."
-  fi
-  cp "/srv/config/phpmyadmin-config/config.inc.php" "/srv/www/default/database-admin/"
-}
-
-wpsvn_check() {
-  # Get all SVN repos.
-  svn_repos=$(find /srv/www -maxdepth 5 -type d -name '.svn');
-
-  # Do we have any?
-  if [[ -n $svn_repos ]]; then
-    for repo in $svn_repos; do
-      # Test to see if an svn upgrade is needed on this repo.
-      svn_test=$( svn status -u "$repo" 2>&1 );
-
-      if [[ "$svn_test" == *"svn upgrade"* ]]; then
-        # If it is needed do it!
-        svn upgrade "${repo/%\.svn/}"
-      fi;
-    done
-  fi;
 }
 
 cleanup_vvv(){
@@ -723,6 +409,17 @@ cleanup_vvv(){
   mv /tmp/hosts /etc/hosts
 }
 
+swoole_install() {
+  if [[ -f /usr/lib/php/20131226/swoole.so ]]; then
+      echo "Swoole already installed"
+  else
+    echo "Install Swoole PHP extend"
+    pecl install swoole
+    cp "/srv/config/php-config/swoole.ini" "/etc/php/5.6/fpm/conf.d/swoole.ini"
+    echo " * Copied /srv/config/php-config/swoole.ini    to /etc/php/5.6/fpm/conf.d/swoole.ini"
+  fi
+}
+
 ### SCRIPT
 #set -xv
 
@@ -732,35 +429,21 @@ echo "Bash profile setup and directories."
 profile_setup
 
 network_check
-# Package and Tools Install
-echo " "
+
 echo "Main packages check and install."
+
 git_ppa_check
 package_install
 tools_install
 nginx_setup
-mailcatcher_setup
 phpfpm_setup
+swoole_install
 services_restart
 mysql_setup
 
 network_check
-# WP-CLI and debugging tools
-echo " "
-echo "Installing/updating wp-cli and debugging tools"
-
-wp_cli
-memcached_admin
-opcached_status
-webgrind_install
-php_codesniff
-phpmyadmin_setup
 
 network_check
-# Time for WordPress!
-echo " "
-
-wpsvn_check
 
 # VVV custom site import
 echo " "

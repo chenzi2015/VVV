@@ -21,7 +21,7 @@ vvv_config['sites'].each do |site, args|
 
   defaults = Hash.new
   defaults['repo']   = false
-  defaults['vm_dir'] = "/srv/www/#{site}"
+  defaults['vm_dir'] = "/home/wwwroot/#{site}"
   defaults['local_dir'] = File.join(vagrant_dir, 'www', site)
   defaults['branch'] = 'master'
   defaults['skip_provisioning'] = false
@@ -187,14 +187,6 @@ Vagrant.configure("2") do |config|
   # virtual machine is destroyed with `vagrant destroy`, your files will remain in your local
   # environment.
 
-  # /srv/database/
-  #
-  # If a database directory exists in the same directory as your Vagrantfile,
-  # a mapped directory inside the VM will be created that contains these files.
-  # This directory is used to maintain default database scripts as well as backed
-  # up mysql dumps (SQL files) that are to be imported automatically on vagrant up
-  config.vm.synced_folder "database/", "/srv/database"
-
   # If the mysql_upgrade_info file from a previous persistent database mapping is detected,
   # we'll continue to map that directory as /var/lib/mysql inside the virtual machine. Once
   # this file is changed or removed, this mapping will no longer occur. A db_backup command
@@ -230,26 +222,26 @@ Vagrant.configure("2") do |config|
   # directory inside the VM will be created for some generated log files.
   config.vm.synced_folder "log/", "/srv/log", :owner => "www-data"
 
-  # /srv/www/
+  # /home/wwwroot/
   #
   # If a www directory exists in the same directory as your Vagrantfile, a mapped directory
   # inside the VM will be created that acts as the default location for nginx sites. Put all
   # of your project files here that you want to access through the web server
   if vagrant_version >= "1.3.0"
-    config.vm.synced_folder "www/", "/srv/www/", :owner => "www-data", :mount_options => [ "dmode=775", "fmode=774" ]
+    config.vm.synced_folder "D:\\preject\\wwwroot", "/home/wwwroot/", :owner => "www-data", :mount_options => [ "dmode=775", "fmode=774" ]
   else
-    config.vm.synced_folder "www/", "/srv/www/", :owner => "www-data", :extra => 'dmode=775,fmode=774'
+    config.vm.synced_folder "D:\\preject\\wwwroot", "/home/wwwroot/", :owner => "www-data", :extra => 'dmode=775,fmode=774'
   end
 
-  vvv_config['sites'].each do |site, args|
-    if args['local_dir'] != File.join(vagrant_dir, 'www', site) then
-      if vagrant_version >= "1.3.0"
-        config.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :mount_options => [ "dmode=775", "fmode=774" ]
-      else
-        config.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :extra => 'dmode=775,fmode=774'
-      end
-    end
-  end
+  # vvv_config['sites'].each do |site, args|
+  #   if args['local_dir'] != File.join(vagrant_dir, 'www', site) then
+  #     if vagrant_version >= "1.3.0"
+  #       config.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :mount_options => [ "dmode=775", "fmode=774" ]
+  #     else
+  #       config.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :extra => 'dmode=775,fmode=774'
+  #     end
+  #   end
+  # end
 
   config.vm.provision "fix-no-tty", type: "shell" do |s|
     s.privileged = false
@@ -260,51 +252,11 @@ Vagrant.configure("2") do |config|
   # those are specific to Virtualbox. The folder is therefore overridden with one that
   # uses corresponding Parallels mount options.
   config.vm.provider :parallels do |v, override|
-    override.vm.synced_folder "www/", "/srv/www/", :owner => "www-data", :mount_options => []
+    override.vm.synced_folder "www/", "/home/wwwroot/", :owner => "www-data", :mount_options => []
 
     vvv_config['sites'].each do |site, args|
       if args['local_dir'] != File.join(vagrant_dir, 'www', site) then
         override.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :mount_options => []
-      end
-    end
-  end
-
-  # The Hyper-V Provider does not understand "dmode"/"fmode" in the "mount_options" as
-  # those are specific to Virtualbox. Furthermore, the normal shared folders need to be
-  # replaced with SMB shares. Here we switch all the shared folders to us SMB and then
-  # override the www folder with options that make it Hyper-V compatible.
-  config.vm.provider :hyperv do |v, override|
-    override.vm.synced_folder "www/", "/srv/www/", :owner => "www-data", :mount_options => ["dir_mode=0775","file_mode=0774","forceuid","noperm","nobrl","mfsymlinks"]
-    vvv_config['sites'].each do |site, args|
-      if args['local_dir'] != File.join(vagrant_dir, 'www', site) then
-        override.vm.synced_folder args['local_dir'], args['vm_dir'], :owner => "www-data", :mount_options => ["dir_mode=0775","file_mode=0774","forceuid","noperm","nobrl","mfsymlinks"]
-      end
-    end
-    # Change all the folder to use SMB instead of Virtual Box shares
-    override.vm.synced_folders.each do |id, options|
-      if ! options[:type]
-        options[:type] = "smb"
-      end
-    end
-  end
-
-  # Customfile - POSSIBLY UNSTABLE
-  #
-  # Use this to insert your own (and possibly rewrite) Vagrant config lines. Helpful
-  # for mapping additional drives. If a file 'Customfile' exists in the same directory
-  # as this Vagrantfile, it will be evaluated as ruby inline as it loads.
-  #
-  # Note that if you find yourself using a Customfile for anything crazy or specifying
-  # different provisioning, then you may want to consider a new Vagrantfile entirely.
-  if File.exists?(File.join(vagrant_dir,'Customfile')) then
-    eval(IO.read(File.join(vagrant_dir,'Customfile')), binding)
-  end
-
-  vvv_config['sites'].each do |site, args|
-    if args['allow_customfile'] then
-      paths = Dir[File.join(args['local_dir'], '**', 'Customfile')]
-      paths.each do |file|
-        eval(IO.read(file), binding)
       end
     end
   end
@@ -330,28 +282,6 @@ Vagrant.configure("2") do |config|
     config.vm.provision "custom", type: "shell", path: File.join( "provision", "provision-custom.sh" )
   else
     config.vm.provision "default", type: "shell", path: File.join( "provision", "provision.sh" )
-  end
-
-  vvv_config['sites'].each do |site, args|
-    config.vm.provision "site-#{site}",
-      type: "shell",
-      path: File.join( "provision", "provision-site.sh" ),
-      args: [
-        site,
-        args['repo'].to_s,
-        args['branch'],
-        args['vm_dir'],
-        args['skip_provisioning'].to_s
-      ]
-  end
-
-
-  # provision-post.sh acts as a post-hook to the default provisioning. Anything that should
-  # run after the shell commands laid out in provision.sh or provision-custom.sh should be
-  # put into this file. This provides a good opportunity to install additional packages
-  # without having to replace the entire default provisioning script.
-  if File.exists?(File.join(vagrant_dir,'provision','provision-post.sh')) then
-    config.vm.provision "post", type: "shell", path: File.join( "provision", "provision-post.sh" )
   end
 
   # Always start MySQL on boot, even when not running the full provisioner

@@ -49,7 +49,7 @@ Multiple projects can be developed at once in the same environment.
 
 VVV's `config`, `database`, `log` and `www` directories are shared with the virtualized server.
 
-These shared directories allow you to work, for example, in `vagrant-local/www/wordpress-default` in your local file system and have those changes immediately reflected in the virtualized server's file system and http://local.wordpress.dev/. Likewise, if you `vagrant ssh` and make modifications to the files in `/srv/www/`, you'll immediately see those changes in your local file system.
+These shared directories allow you to work, for example, in `vagrant-local/www/wordpress-default` in your local file system and have those changes immediately reflected in the virtualized server's file system and http://local.wordpress.dev/. Likewise, if you `vagrant ssh` and make modifications to the files in `/home/wwwroot/`, you'll immediately see those changes in your local file system.
 
 #### VVV as a Scaffold
 
@@ -150,13 +150,13 @@ See: [Connecting to MySQL MariaDB](https://github.com/Varying-Vagrant-Vagrants/V
 
 #### WordPress Stable
 * LOCAL PATH: vagrant-local/www/wordpress-default
-* VM PATH: /srv/www/wordpress-default
+* VM PATH: /home/wwwroot/wordpress-default
 * URL: `http://local.wordpress.dev`
 * DB Name: `wordpress_default`
 
 #### WordPress Develop
 * LOCAL PATH: vagrant-local/www/wordpress-develop
-* VM PATH: /srv/www/wordpress-develop
+* VM PATH: /home/wwwroot/wordpress-develop
 * /src URL: `http://src.wordpress-develop.dev`
 * /build URL: `http://build.wordpress-develop.dev`
 * DB Name: `wordpress_develop`
@@ -173,7 +173,7 @@ A bunch of stuff!
 1. [WP-CLI](http://wp-cli.org/) (master branch)
 1. [nginx](http://nginx.org/) ([mainline](http://nginx.com/blog/nginx-1-6-1-7-released/) version)
 1. [mysql](https://www.mysql.com/) 5.5.x
-1. [php-fpm](http://php-fpm.org/) 7.0.x
+1. [php-fpm](http://php-fpm.org/) 5.6.x
 1. [memcached](http://memcached.org/)
 1. PHP [memcache extension](https://pecl.php.net/package/memcache)
 1. PHP [xdebug extension](https://pecl.php.net/package/xdebug/)

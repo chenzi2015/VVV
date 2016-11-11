@@ -10,7 +10,7 @@ if [[ $USER != 'vagrant' ]]; then
 	exit 1
 fi
 
-cd /srv/www/wordpress-develop/
+cd /home/wwwroot/wordpress-develop/
 
 if [[ -e .git ]]; then
 	echo "Repo has already been converted to Git"
@@ -25,9 +25,9 @@ mv .svn .svn-backup
 git clone --no-checkout git://develop.git.wordpress.org/ /tmp/wp-git
 cd /tmp/wp-git
 git reset -q .
-cd /srv/www/wordpress-develop/
+cd /home/wwwroot/wordpress-develop/
 
-echo "Moving .git dir to /srv/www/wordpress-develop/"
+echo "Moving .git dir to /home/wwwroot/wordpress-develop/"
 mv /tmp/wp-git/.git .git
 git config core.fileMode false
 git config diff.noprefix true

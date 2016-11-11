@@ -6,7 +6,7 @@
 
 * PHP 7.0.x has now replaced PHP 5.5.x. See [#844](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/844).c
 * Update PHPUnit to the latest stable 5.6.x version. See [#1004](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/1004)
-* Xdebug 2.4.0 is now built from source to provide PHP 7.0.x support. See [#869](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/869).
+* Xdebug 2.4.0 is now built from source to provide PHP 5.6.x support. See [#869](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/869).
 * Disable Xdebug during provisioning so that Composer can operate at normal speed. See [#971](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/971)
 * Improve the package installation check to avoid false positives. See [#840](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/840).
 * Allow `vvv-nginx.conf` to be located in a project's subdirectory. See [#852](https://github.com/Varying-Vagrant-Vagrants/VVV/pull/852).
@@ -167,7 +167,7 @@
 * Grab stable WordPress from latest.tar.gz vs SVN
 * Append custom apt sources list to default
 * Update to SVN 1.7.9, addresses specific Windows permissions issue
-* Move [wp-cli](https://github.com/wp-cli/wp-cli) to /srv/www/ for easier contributions
+* Move [wp-cli](https://github.com/wp-cli/wp-cli) to /home/wwwroot/ for easier contributions
 
 ## 0.5
 * Repository moved under [10up organization](http://github.com/10up/varying-vagrant-vagrants)
