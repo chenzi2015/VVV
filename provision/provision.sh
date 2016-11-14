@@ -53,71 +53,29 @@ apt_package_check_list=(
   php5.6-xml
   php5.6-zip
   php5.6-redis
+  php5.6-gearman
 
   # nginx is installed as the default web server
   nginx
 
-  # mysql is the default database
-  mysql-server
-
   # other packages that come in handy
-  imagemagick
-  subversion
-  git
   zip
   unzip
   ngrep
   curl
   make
   vim
-  colordiff
-  postfix
 
   # ntp service to keep clock current
   ntp
 
-  beanstalkd
+  #gearman
+  gearman
+  gearman-server
+  libgearman-dev
 )
 
 ### FUNCTIONS
-
-network_detection() {
-  # Network Detection
-  #
-  # Make an HTTP request to baidu.com to determine if outside access is available
-  # to us. If 3 attempts with a timeout of 5 seconds are not successful, then we'll
-  # skip a few things further in provisioning rather than create a bunch of errors.
-  if [[ "$(wget --tries=3 --timeout=5 --spider http://www.baidu.com 2>&1 | grep 'connected')" ]]; then
-    echo "Network connection detected..."
-    ping_result="Connected"
-  else
-    echo "Network connection not detected. Unable to reach baidu.com..."
-    ping_result="Not Connected"
-  fi
-}
-
-network_check() {
-  network_detection
-  if [[ ! "$ping_result" == "Connected" ]]; then
-    echo -e "\nNo network connection available, skipping package installation"
-#    exit 0
-  fi
-}
-
-git_ppa_check() {
-  # git
-  #
-  # apt-get does not have latest version of git,
-  # so let's the use ppa repository instead.
-  #
-  # Install prerequisites.
-  sudo apt-get install -y python-software-properties software-properties-common &>/dev/null
-  # Add ppa repo.
-  echo "Adding ppa:git-core/ppa repository"
-  sudo add-apt-repository -y ppa:git-core/ppa &>/dev/null
-  # Update apt-get info.
-  sudo apt-get update &>/dev/null
-}
 
 noroot() {
   sudo -EH -u "vagrant" "$@";
@@ -125,32 +83,27 @@ noroot() {
 
 profile_setup() {
   # Copy custom dotfiles and bin file for the vagrant user from local
-  cp "/srv/config/bash_profile" "/home/vagrant/.bash_profile"
-  cp "/srv/config/bash_aliases" "/home/vagrant/.bash_aliases"
-  cp "/srv/config/vimrc" "/home/vagrant/.vimrc"
-
-  if [[ ! -d "/home/vagrant/.subversion" ]]; then
-    mkdir "/home/vagrant/.subversion"
-  fi
-
-  cp "/srv/config/subversion-servers" "/home/vagrant/.subversion/servers"
+  cp "/home/config/bash_profile" "/home/vagrant/.bash_profile"
+  cp "/home/config/bash_aliases" "/home/vagrant/.bash_aliases"
+  cp "/home/config/vimrc" "/home/vagrant/.vimrc"
+  cp "/home/config/subversion-servers" "/home/vagrant/.subversion/servers"
 
   if [[ ! -d "/home/vagrant/bin" ]]; then
     mkdir "/home/vagrant/bin"
   fi
 
-  rsync -rvzh --delete "/srv/config/homebin/" "/home/vagrant/bin/"
+  rsync -rvzh --delete "/home/config/homebin/" "/home/vagrant/bin/"
 
-  echo " * Copied /srv/config/bash_profile                      to /home/vagrant/.bash_profile"
-  echo " * Copied /srv/config/bash_aliases                      to /home/vagrant/.bash_aliases"
-  echo " * Copied /srv/config/vimrc                             to /home/vagrant/.vimrc"
-  echo " * Copied /srv/config/subversion-servers                to /home/vagrant/.subversion/servers"
-  echo " * rsync'd /srv/config/homebin                          to /home/vagrant/bin"
+  echo " * Copied /home/config/bash_profile                      to /home/vagrant/.bash_profile"
+  echo " * Copied /home/config/bash_aliases                      to /home/vagrant/.bash_aliases"
+  echo " * Copied /home/config/vimrc                             to /home/vagrant/.vimrc"
+  echo " * Copied /home/config/subversion-servers                to /home/vagrant/.subversion/servers"
+  echo " * rsync'd /home/config/homebin                          to /home/vagrant/bin"
 
   # If a bash_prompt file exists in the VVV config/ directory, copy to the VM.
-  if [[ -f "/srv/config/bash_prompt" ]]; then
-    cp "/srv/config/bash_prompt" "/home/vagrant/.bash_prompt"
-    echo " * Copied /srv/config/bash_prompt to /home/vagrant/.bash_prompt"
+  if [[ -f "/home/config/bash_prompt" ]]; then
+    cp "/home/config/bash_prompt" "/home/vagrant/.bash_prompt"
+    echo " * Copied /home/config/bash_prompt to /home/vagrant/.bash_prompt"
   fi
 }
 
@@ -196,30 +149,6 @@ package_check() {
 
 package_install() {
   package_check
-
-  # MySQL
-  #
-  # Use debconf-set-selections to specify the default password for the root MySQL
-  # account. This runs on every provision, even if MySQL has been installed. If
-  # MySQL is already installed, it will not affect anything.
-  echo mysql-server mysql-server/root_password password "root" | debconf-set-selections
-  echo mysql-server mysql-server/root_password_again password "root" | debconf-set-selections
-
-  # Postfix
-  #
-  # Use debconf-set-selections to specify the selections in the postfix setup. Set
-  # up as an 'Internet Site' with the host name 'vvv'. Note that if your current
-  # Internet connection does not allow communication over port 25, you will not be
-  # able to send mail, even with postfix installed.
-  echo postfix postfix/main_mailer_type select Internet Site | debconf-set-selections
-  echo postfix postfix/mailname string vvv | debconf-set-selections
-
-  # Disable ipv6 as some ISPs/mail servers have problems with it
-  echo "inet_protocols = ipv4" >> "/etc/postfix/main.cf"
-
-  # Provide our custom apt sources before running `apt-get update`
-  ln -sf /srv/config/apt-source-append.list /etc/apt/sources.list.d/vvv-sources.list
-  echo "Linked custom apt sources"
 
   if [[ ${#apt_package_install_list[@]} = 0 ]]; then
     echo -e "No apt packages to install.\n"
@@ -305,28 +234,27 @@ nginx_setup() {
   echo -e "\nSetup configuration files..."
 
   # Used to ensure proper services are started on `vagrant up`
-  cp "/srv/config/init/vvv-start.conf" "/etc/init/vvv-start.conf"
-  echo " * Copied /srv/config/init/vvv-start.conf               to /etc/init/vvv-start.conf"
+  cp "/home/config/init/start.conf" "/etc/init/start.conf"
+  echo " * Copied /home/config/init/start.conf               to /etc/init/start.conf"
 
   # Copy nginx configuration from local
-  cp "/srv/config/nginx-config/nginx.conf" "/etc/nginx/nginx.conf"
-  cp "/srv/config/nginx-config/nginx-wp-common.conf" "/etc/nginx/nginx-wp-common.conf"
+  cp "/home/config/nginx-config/nginx.conf" "/etc/nginx/nginx.conf"
   if [[ ! -d "/etc/nginx/custom-sites" ]]; then
     mkdir "/etc/nginx/custom-sites/"
   fi
-  rsync -rvzh --delete "/srv/config/nginx-config/sites/" "/etc/nginx/custom-sites/"
-  cp "/srv/config/nginx-config/other.conf" "/etc/nginx/other.conf"
-  cp "/srv/config/nginx-config/fastcgi_params" "/etc/nginx/fastcgi_params"
-  cp "/srv/config/nginx-config/enable-php.conf" "/etc/nginx/enable-php.conf"
-  cp "/srv/config/nginx-config/discuz.conf" "/etc/nginx/discuz.conf"
+  rsync -rvzh --delete "/home/config/nginx-config/sites/" "/etc/nginx/custom-sites/"
+  cp "/home/config/nginx-config/other.conf" "/etc/nginx/other.conf"
+  cp "/home/config/nginx-config/fastcgi_params" "/etc/nginx/fastcgi_params"
+  cp "/home/config/nginx-config/enable-php.conf" "/etc/nginx/enable-php.conf"
+  cp "/home/config/nginx-config/discuz.conf" "/etc/nginx/discuz.conf"
 
-  echo " * Copied /srv/config/nginx-config/nginx.conf           to /etc/nginx/nginx.conf"
-  echo " * Copied /srv/config/nginx-config/nginx-wp-common.conf to /etc/nginx/nginx-wp-common.conf"
-  echo " * Rsync'd /srv/config/nginx-config/sites/              to /etc/nginx/custom-sites"
-  echo " * Copied /srv/config/nginx-config/other.conf           to /etc/nginx/other.conf"
-  echo " * Copied /srv/config/nginx-config/fastcgi_params       to /etc/nginx/fastcgi_params"
-  echo " * Copied /srv/config/nginx-config/enable-php.conf      to /etc/nginx/enable-php.conf"
-  echo " * Copied /srv/config/nginx-config/discuz.conf          to /etc/nginx/discuz.conf"
+  echo " * Copied /home/config/nginx-config/nginx.conf           to /etc/nginx/nginx.conf"
+  echo " * Copied /home/config/nginx-config/nginx-wp-common.conf to /etc/nginx/nginx-wp-common.conf"
+  echo " * Rsync'd /home/config/nginx-config/sites/              to /etc/nginx/custom-sites"
+  echo " * Copied /home/config/nginx-config/other.conf           to /etc/nginx/other.conf"
+  echo " * Copied /home/config/nginx-config/fastcgi_params       to /etc/nginx/fastcgi_params"
+  echo " * Copied /home/config/nginx-config/enable-php.conf      to /etc/nginx/enable-php.conf"
+  echo " * Copied /home/config/nginx-config/discuz.conf          to /etc/nginx/discuz.conf"
 
   if [[ ! -d "/home/wwwlogs" ]]; then
     mkdir "/home/wwwlogs"
@@ -335,50 +263,21 @@ nginx_setup() {
 
 phpfpm_setup() {
   # Copy php-fpm configuration from local
-  cp "/srv/config/php-config/php5.6-fpm.conf" "/etc/php/5.6/fpm/php-fpm.conf"
-  cp "/srv/config/php-config/www.conf" "/etc/php/5.6/fpm/pool.d/www.conf"
-  cp "/srv/config/php-config/php-custom.ini" "/etc/php/5.6/fpm/conf.d/php-custom.ini"
-  cp "/srv/config/php-config/opcache.ini" "/etc/php/5.6/fpm/conf.d/opcache.ini"
-  cp "/srv/config/php-config/xdebug.ini" "/etc/php/5.6/fpm/conf.d/xdebug.ini"
+  cp "/home/config/php-config/php5.6-fpm.conf" "/etc/php/5.6/fpm/php-fpm.conf"
+  cp "/home/config/php-config/www.conf" "/etc/php/5.6/fpm/pool.d/www.conf"
+  cp "/home/config/php-config/php-custom.ini" "/etc/php/5.6/fpm/conf.d/php-custom.ini"
+  cp "/home/config/php-config/opcache.ini" "/etc/php/5.6/fpm/conf.d/opcache.ini"
+  cp "/home/config/php-config/xdebug.ini" "/etc/php/5.6/fpm/conf.d/xdebug.ini"
 
   # Find the path to Xdebug and prepend it to xdebug.ini
   XDEBUG_PATH=$( find /usr/lib/php/ -name 'xdebug.so' | head -1 )
   sed -i "1izend_extension=\"$XDEBUG_PATH\"" "/etc/php/5.6/fpm/conf.d/xdebug.ini"
 
-  echo " * Copied /srv/config/php-config/php5.6-fpm.conf     to /etc/php/5.6/fpm/php-fpm.conf"
-  echo " * Copied /srv/config/php-config/www.conf          to /etc/php/5.6/fpm/pool.d/www.conf"
-  echo " * Copied /srv/config/php-config/php-custom.ini    to /etc/php/5.6/fpm/conf.d/php-custom.ini"
-  echo " * Copied /srv/config/php-config/opcache.ini       to /etc/php/5.6/fpm/conf.d/opcache.ini"
-  echo " * Copied /srv/config/php-config/xdebug.ini        to /etc/php/5.6/fpm/conf.d/xdebug.ini"
-}
-
-mysql_setup() {
-  # If MySQL is installed, go through the various imports and service tasks.
-  local exists_mysql
-
-  exists_mysql="$(service mysql status)"
-  if [[ "mysql: unrecognized service" != "${exists_mysql}" ]]; then
-    echo -e "\nSetup MySQL configuration file links..."
-
-    # Copy mysql configuration from local
-    cp "/srv/config/mysql-config/my.cnf" "/etc/mysql/my.cnf"
-    cp "/srv/config/mysql-config/root-my.cnf" "/home/vagrant/.my.cnf"
-
-    echo " * Copied /srv/config/mysql-config/my.cnf               to /etc/mysql/my.cnf"
-    echo " * Copied /srv/config/mysql-config/root-my.cnf          to /home/vagrant/.my.cnf"
-
-    # MySQL gives us an error if we restart a non running service, which
-    # happens after a `vagrant halt`. Check to see if it's running before
-    # deciding whether to start or restart.
-    if [[ "mysql stop/waiting" == "${exists_mysql}" ]]; then
-      echo "service mysql start"
-      service mysql start
-      else
-      echo "service mysql restart"
-      service mysql restart
-    fi
-
-  fi
+  echo " * Copied /home/config/php-config/php5.6-fpm.conf     to /etc/php/5.6/fpm/php-fpm.conf"
+  echo " * Copied /home/config/php-config/www.conf          to /etc/php/5.6/fpm/pool.d/www.conf"
+  echo " * Copied /home/config/php-config/php-custom.ini    to /etc/php/5.6/fpm/conf.d/php-custom.ini"
+  echo " * Copied /home/config/php-config/opcache.ini       to /etc/php/5.6/fpm/conf.d/opcache.ini"
+  echo " * Copied /home/config/php-config/xdebug.ini        to /etc/php/5.6/fpm/conf.d/xdebug.ini"
 }
 
 services_restart() {
@@ -399,9 +298,6 @@ services_restart() {
 }
 
 cleanup_vvv(){
-  # Kill previously symlinked Nginx configs
-  find /etc/nginx/custom-sites -name 'vvv-auto-*.conf' -exec rm {} \;
-
   # Cleanup the hosts file
   echo "Cleaning the virtual machine's /etc/hosts file..."
   sed -n '/# vvv-auto$/!p' /etc/hosts > /tmp/hosts
@@ -415,37 +311,55 @@ swoole_install() {
   else
     echo "Install Swoole PHP extend"
     pecl install swoole
-    cp "/srv/config/php-config/swoole.ini" "/etc/php/5.6/fpm/conf.d/swoole.ini"
-    echo " * Copied /srv/config/php-config/swoole.ini    to /etc/php/5.6/fpm/conf.d/swoole.ini"
+    cp "/home/config/php-config/swoole.ini" "/etc/php/5.6/fpm/conf.d/swoole.ini"
+    echo " * Copied /home/config/php-config/swoole.ini    to /etc/php/5.6/fpm/conf.d/swoole.ini"
   fi
 }
 
+gearmand_install() {
+    if [[ -f /usr/lib/php/20151012/gearmand.so ]]; then
+          echo "gearmand already installed"
+      else
+          echo "Installing gearmand"
+          # Download and extract gearmand.
+          curl -L -O --silent https://github.com/gearman/gearmand/releases/download/1.1.13/gearmand-1.1.13.tar.gz
+          tar -xf gearmand-1.1.13.tar.gz
+          cd gearmand-1.1.13
+          # Create a build environment for Xdebug based on our PHP configuration.
+          phpize
+          # Complete configuration of the Xdebug build.
+          ./configure -q
+          # Build the Xdebug module for use with PHP.
+          make && make install -s > /dev/null
+          # Clean up.
+          cd ..
+          rm -rf gearmand-1.1.13*
+          echo "gearmand installed"
+      fi
+
+    #start gearmand server
+    echo 'start gearmand server'
+    gearmand -d
+
+    #instal gearman module
+    echo "install gearman module"
+    pecl install gearman-1.1.2
+}
 ### SCRIPT
 #set -xv
 
-network_check
 # Profile_setup
 echo "Bash profile setup and directories."
 profile_setup
-
-network_check
-
 echo "Main packages check and install."
-
-git_ppa_check
 package_install
 tools_install
 nginx_setup
 phpfpm_setup
 swoole_install
 services_restart
-mysql_setup
 
-network_check
-
-network_check
-
-# VVV custom site import
+#custom site import
 echo " "
 cleanup_vvv
 

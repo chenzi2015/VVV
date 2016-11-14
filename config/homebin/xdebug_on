@@ -3,5 +3,5 @@ sudo phpenmod xdebug
 sudo service php5.6-fpm restart
 
 # Ensure the log file for xdebug is group writeable.
-sudo touch /srv/log/xdebug-remote.log
-sudo chmod 664 /srv/log/xdebug-remote.log
+sudo touch /home/log/xdebug-remote.log
+sudo chmod 664 /home/log/xdebug-remote.log
